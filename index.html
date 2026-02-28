@@ -1,102 +1,321 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+<!doctype html>
+<html lang="zh">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>China Influencer City Map</title>
-
-<!-- 本地加载 ECharts -->
-<script src="./assets/echarts.min.js"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>2025 Wanghong City Index TOP20</title>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #111;
-  color: #fff;
-  font-family: Arial, sans-serif;
-}
-#main {
-  width: 100%;
-  height: 100vh;
-}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(59,130,246,0.25), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(14,165,233,0.25), transparent 40%),
+      linear-gradient(135deg,#0b1120,#111827);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:#e2e8f0;
+  }
+
+  #chart{
+    width:100%;
+    height:720px;
+  }
+
+  .hdr{
+    position:absolute; left:60px; top:40px; z-index:10;
+  }
+  .hdr h3{ margin:0 0 8px; font-size:26px; font-weight:800; }
+  .hdr p{ margin:0; font-size:13px; opacity:.65; }
+
+  .controls{
+    position:absolute; right:60px; top:40px; z-index:20;
+    display:flex; gap:10px;
+  }
+  .btn{
+    padding:8px 16px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(255,255,255,0.06);
+    color:#e2e8f0;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .btn:hover{ background:rgba(255,255,255,0.14); }
+
+  .panel{
+    position:absolute; right:60px; top:160px; z-index:15;
+    width:340px;
+    background:rgba(255,255,255,0.06);
+    backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:20px;
+    padding:22px;
+  }
+  .panel h4{ margin:0 0 16px; font-size:15px; font-weight:800; }
+
+  .row{
+    display:grid;
+    grid-template-columns:40px 1fr 96px;
+    padding:10px 8px;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .row:hover{ background:rgba(255,255,255,0.10); }
+  .rank{ opacity:.45; font-weight:800; }
+  .city{ font-weight:650; }
+  .score{
+    text-align:right;
+    font-weight:900;
+    color:#38bdf8;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .source{
+    text-align:center;
+    margin:60px auto;
+    max-width:900px;
+    font-size:14px;
+    opacity:.65;
+    padding:0 18px;
+  }
+
+  @media (max-width: 1000px){
+    .panel{ display:none; }
+  }
 </style>
 </head>
 
 <body>
-<div id="main"></div>
+  <div class="hdr">
+    <h3 id="titleText">2025年中国网红城市指数 TOP20</h3>
+    <p id="descText">鼠标悬停查看信息；支持缩放与拖拽</p>
+  </div>
 
+  <div class="controls">
+    <div id="langBtn" class="btn">English</div>
+  </div>
+
+  <div id="chart"></div>
+
+  <div class="panel">
+    <h4 id="panelTitle">TOP20 榜单</h4>
+    <div id="rankList"></div>
+  </div>
+
+  <div class="source" id="sourceText">
+    数据来源：鸥维数据 × 驱动中国《2025全年热度榜》之《2025年中国网红城市指数TOP20》。
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script>
-const chart = echarts.init(document.getElementById('main'));
+  // ===== i18n =====
+  const I18N = {
+    zh:{
+      title:"2025年中国网红城市指数 TOP20",
+      desc:"鼠标悬停查看信息；支持缩放与拖拽",
+      panel:"TOP20 榜单",
+      source:"数据来源：鸥维数据 × 驱动中国《2025全年热度榜》之《2025年中国网红城市指数TOP20》。",
+      langBtn:"English",
+      tooltipIndex:"指数"
+    },
+    en:{
+      title:"China Wanghong City Index TOP20 (2025)",
+      desc:"Hover to view details; zoom & pan supported",
+      panel:"Top 20 Ranking",
+      source:"Source: Owee Data × Qudong China, 2025 Annual Heat Ranking (Wanghong City Index TOP20).",
+      langBtn:"中文",
+      tooltipIndex:"Index"
+    }
+  };
+  let lang = "zh";
 
-// 本地 GeoJSON
-const CHINA_GEOJSON = "./assets/100000_full.json";
-
-// 示例城市数据（可替换成你自己的）
-const cityData = [
-  {name: "北京", value: 95},
-  {name: "上海", value: 98},
-  {name: "广州", value: 88},
-  {name: "深圳", value: 92},
-  {name: "杭州", value: 85},
-  {name: "成都", value: 80},
-  {name: "重庆", value: 78},
-  {name: "武汉", value: 75}
-];
-
-async function initMap() {
-  try {
-    const response = await fetch(CHINA_GEOJSON);
-    const geoJson = await response.json();
-
-    echarts.registerMap('china', geoJson);
-
-    const option = {
-      tooltip: {
-        trigger: 'item'
-      },
-      visualMap: {
-        min: 0,
-        max: 100,
-        left: 'left',
-        top: 'bottom',
-        text: ['High','Low'],
-        calculable: true,
-        inRange: {
-          color: ['#2c7bb6', '#ffffbf', '#d7191c']
-        }
-      },
-      series: [
-        {
-          name: 'Influencer Index',
-          type: 'map',
-          map: 'china',
-          roam: true,
-          emphasis: {
-            label: {
-              show: true
-            }
-          },
-          data: cityData
-        }
-      ]
-    };
-
-    chart.setOption(option);
-
-  } catch (error) {
-    document.body.innerHTML = "<h2 style='color:red;text-align:center;margin-top:40vh;'>地图加载失败，请确认 assets 文件夹存在</h2>";
-    console.error(error);
+  // ===== Province name translation (GeoJSON is Chinese) =====
+  const PROVINCE_EN = {
+    "北京":"Beijing","天津":"Tianjin","上海":"Shanghai","重庆":"Chongqing",
+    "河北":"Hebei","山西":"Shanxi","辽宁":"Liaoning","吉林":"Jilin","黑龙江":"Heilongjiang",
+    "江苏":"Jiangsu","浙江":"Zhejiang","安徽":"Anhui","福建":"Fujian","江西":"Jiangxi","山东":"Shandong",
+    "河南":"Henan","湖北":"Hubei","湖南":"Hunan","广东":"Guangdong","海南":"Hainan",
+    "四川":"Sichuan","贵州":"Guizhou","云南":"Yunnan","陕西":"Shaanxi","甘肃":"Gansu","青海":"Qinghai",
+    "台湾":"Taiwan","内蒙古":"Inner Mongolia","广西":"Guangxi","西藏":"Tibet","宁夏":"Ningxia","新疆":"Xinjiang",
+    "香港":"Hong Kong","澳门":"Macao"
+  };
+  function translateRegionName(name){
+    if (lang === "zh") return name;
+    return PROVINCE_EN[name] || name;
   }
-}
 
-initMap();
+  // ===== Official TOP20 data (bilingual) =====
+  // value: [lon, lat, index]
+  const CITY = [
+    { zh:"上海", en:"Shanghai",   value:[121.4737,31.2304,182.87] },
+    { zh:"北京", en:"Beijing",    value:[116.4074,39.9042,176.66] },
+    { zh:"重庆", en:"Chongqing",  value:[106.5516,29.5630,147.73] },
+    { zh:"西安", en:"Xi'an",      value:[108.9398,34.3416,143.96] },
+    { zh:"成都", en:"Chengdu",    value:[104.0665,30.5723,135.01] },
+    { zh:"南京", en:"Nanjing",    value:[118.7969,32.0603,127.59] },
+    { zh:"杭州", en:"Hangzhou",   value:[120.1551,30.2741,120.52] },
+    { zh:"广州", en:"Guangzhou",  value:[113.2644,23.1291,118.62] },
+    { zh:"深圳", en:"Shenzhen",   value:[114.0579,22.5431,117.95] },
+    { zh:"武汉", en:"Wuhan",      value:[114.3054,30.5931,114.44] },
+    { zh:"天津", en:"Tianjin",    value:[117.2000,39.0842,112.50] },
+    { zh:"香港", en:"Hong Kong",  value:[114.1694,22.3193,112.42] },
+    { zh:"哈尔滨", en:"Harbin",   value:[126.6424,45.7560,106.87] },
+    { zh:"苏州", en:"Suzhou",     value:[120.6196,31.2990,86.98] },
+    { zh:"沈阳", en:"Shenyang",   value:[123.4315,41.8057,85.88] },
+    { zh:"大连", en:"Dalian",     value:[121.6147,38.9140,85.86] },
+    { zh:"青岛", en:"Qingdao",    value:[120.3826,36.0671,81.65] },
+    { zh:"郑州", en:"Zhengzhou",  value:[113.6254,34.7466,81.54] },
+    { zh:"厦门", en:"Xiamen",     value:[118.0894,24.4798,76.78] },
+    { zh:"济南", en:"Jinan",      value:[117.1201,36.6512,75.01] }
+  ];
 
-window.addEventListener('resize', function () {
-  chart.resize();
-});
+  function seriesData(){
+    return CITY.map((c, idx) => ({
+      name: (lang==="zh") ? c.zh : c.en,
+      zh: c.zh,
+      en: c.en,
+      rank: idx + 1,
+      value: c.value
+    }));
+  }
+
+  function updateUI(){
+    document.getElementById("titleText").innerText = I18N[lang].title;
+    document.getElementById("descText").innerText  = I18N[lang].desc;
+    document.getElementById("panelTitle").innerText= I18N[lang].panel;
+    document.getElementById("sourceText").innerText= I18N[lang].source;
+    document.getElementById("langBtn").innerText   = I18N[lang].langBtn;
+  }
+
+  function renderRanking(){
+    const list = document.getElementById("rankList");
+    list.innerHTML = "";
+    CITY.forEach((c, i) => {
+      const name = (lang==="zh") ? c.zh : c.en;
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <div class="rank">#${i+1}</div>
+        <div class="city">${name}</div>
+        <div class="score">${c.value[2].toFixed(2)}</div>
+      `;
+      // hover link to map point
+      row.addEventListener("mouseenter", ()=> {
+        if (!window._chartReady) return;
+        chart.dispatchAction({ type:"highlight", seriesName:"Cities", name });
+      });
+      row.addEventListener("mouseleave", ()=> {
+        if (!window._chartReady) return;
+        chart.dispatchAction({ type:"downplay", seriesName:"Cities", name });
+      });
+      list.appendChild(row);
+    });
+  }
+
+  const chart = echarts.init(document.getElementById("chart"));
+  const CHINA_GEOJSON = "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json";
+
+  function buildOption(){
+    const data = seriesData();
+    const vals = CITY.map(d => d.value[2]);
+    const minV = Math.min(...vals);
+    const maxV = Math.max(...vals);
+
+    return {
+      backgroundColor: "transparent",
+      tooltip:{
+        trigger:"item",
+        formatter:(p)=>{
+          // Province hover
+          if (!p.value) return `<b>${translateRegionName(p.name)}</b>`;
+          // City hover
+          return `<b>${p.name}</b><br/>${I18N[lang].tooltipIndex}: ${p.value[2]}`;
+        }
+      },
+      geo:{
+        map:"china",
+        roam:true,
+
+        // ✅ 深色地图底 + ✅ 省界线浅色（你要的重点）
+        itemStyle:{
+          areaColor:"#121a2b",
+          borderColor:"rgba(226,232,240,0.55)",  // 浅色分界线
+          borderWidth: 1.2
+        },
+        emphasis:{
+          itemStyle:{
+            areaColor:"#17233a",
+            borderColor:"rgba(226,232,240,0.85)",
+            borderWidth: 1.5
+          }
+        }
+      },
+      series:[{
+        name:"Cities",
+        type:"scatter",
+        coordinateSystem:"geo",
+        data,
+        symbolSize:(val)=>{
+          const t = (val[2]-minV)/(maxV-minV);
+          return 7 + t*18;
+        },
+        itemStyle:{
+          color:"#3b82f6",
+          shadowBlur: 22,
+          shadowColor:"rgba(59,130,246,0.85)"
+        },
+        emphasis:{
+          itemStyle:{
+            color:"#60a5fa",
+            shadowBlur: 28
+          }
+        },
+        label:{
+          show:true,
+          formatter:(p)=>p.name,
+          position:"right",
+          color:"#e2e8f0",
+          fontWeight:700,
+          textBorderColor:"#0b1120",
+          textBorderWidth:4
+        }
+      }]
+    };
+  }
+
+  async function init(){
+    try{
+      const res = await fetch(CHINA_GEOJSON);
+      const geoJson = await res.json();
+      echarts.registerMap("china", geoJson);
+
+      chart.setOption(buildOption(), true);
+      window._chartReady = true;
+    }catch(e){
+      console.error(e);
+      chart.setOption({
+        title:{
+          text:"Map failed to load. Check network/CDN access.",
+          left:"center",
+          top:"middle",
+          textStyle:{ color:"#94a3b8", fontSize:14 }
+        }
+      });
+    }
+  }
+
+  document.getElementById("langBtn").onclick = ()=>{
+    lang = (lang==="zh") ? "en" : "zh";
+    updateUI();
+    renderRanking();
+    if (window._chartReady) chart.setOption(buildOption(), true);
+  };
+
+  updateUI();
+  renderRanking();
+  init();
+  window.addEventListener("resize", ()=> chart.resize());
 </script>
-
 </body>
 </html>
